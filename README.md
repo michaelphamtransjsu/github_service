@@ -17,8 +17,9 @@ make run
 
 Set `GITHUB_TOKEN`, `GITHUB_OWNER`, and `GITHUB_REPO` only when you intentionally want live API
 access. Set a strong `GITHUB_WEBHOOK_SECRET` before accepting webhooks. The default SQLite file is
-local; Docker Compose stores it in a named volume. Do not expose `/events` publicly without adding
-authentication.
+local; Docker Compose stores it in a named volume. `WEBHOOK_MAX_BODY_BYTES` limits webhook request
+bodies and defaults to 1 MiB. `/events` is an intentionally unauthenticated local debugging route;
+do not expose it publicly.
 
 ## Examples
 
@@ -36,6 +37,16 @@ curl http://localhost:8000/events
 GitHub must send `X-GitHub-Event`, `X-GitHub-Delivery`, and `X-Hub-Signature-256` headers to
 `POST /webhook`. Generate the signature over the exact raw request bytes; never paste secrets into
 shell history in a real environment. Supported events are `ping`, `issues`, and `issue_comment`.
+
+Issue creation returns a relative `Location` header. List operations forward GitHub's `Link`
+header. Dependency rate-limit headers are forwarded when safe, exhausted limits become `429`,
+timeouts become `504`, and unavailable or malformed GitHub responses become `503`. All client
+validation errors use the structured error envelope with status `400`; invalid webhook signatures
+use `401`, and oversized webhook bodies use `413`.
+
+Issue deletion is represented by patching its state to `closed`; patching it back to `open`
+reopens it. Comments support only creation and per-issue listing—individual comment read, update,
+and deletion are intentionally outside this assignment.
 
 ## Operations
 

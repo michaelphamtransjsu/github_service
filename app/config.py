@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     GITHUB_REPO: str | None = None
     GITHUB_WEBHOOK_SECRET: SecretStr | None = None
     GITHUB_API_URL: str = "https://api.github.com"
+    WEBHOOK_MAX_BODY_BYTES: int = Field(default=1_048_576, gt=0)
 
 
 @lru_cache

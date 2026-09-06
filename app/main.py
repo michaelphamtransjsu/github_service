@@ -1,6 +1,7 @@
 """FastAPI application factory and exception mapping."""
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
@@ -22,22 +23,25 @@ def create_app() -> FastAPI:
     application.add_middleware(RequestContextMiddleware)
     application.include_router(router)
 
-    def error(request: Request, status: int, code: str, message: str, details=None):
+    def error(request: Request, status: int, code: str, message: str, details=None, headers=None):
         return JSONResponse(
             status_code=status,
-            content={
-                "error": {
-                    "code": code,
-                    "message": message,
-                    "request_id": request.state.request_id,
-                    **({"details": details} if details else {}),
+            content=jsonable_encoder(
+                {
+                    "error": {
+                        "code": code,
+                        "message": message,
+                        "request_id": request.state.request_id,
+                        **({"details": details} if details else {}),
+                    }
                 }
-            },
+            ),
+            headers=headers,
         )
 
     @application.exception_handler(GitHubError)
     async def github_error(request: Request, exc: GitHubError):
-        return error(request, exc.status_code, exc.code, exc.message, exc.details)
+        return error(request, exc.status_code, exc.code, exc.message, exc.details, exc.headers)
 
     @application.exception_handler(HTTPException)
     async def http_error(request: Request, exc: HTTPException):
@@ -46,7 +50,7 @@ def create_app() -> FastAPI:
     @application.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError):
         return error(
-            request, 422, "validation_error", "Request validation failed.", {"errors": exc.errors()}
+            request, 400, "validation_error", "Request validation failed.", {"errors": exc.errors()}
         )
 
     return application
