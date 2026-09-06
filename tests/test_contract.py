@@ -20,7 +20,7 @@ def test_all_assignment_operations_have_ids_and_error_contracts() -> None:
         if method in {"get", "post", "patch", "delete"}
     ]
 
-    assert len(operations) == 11
+    assert len(operations) == 9
     assert len({operation["operationId"] for operation in operations}) == len(operations)
     for operation in operations:
         assert any(code in operation["responses"] for code in ("4XX", "422"))

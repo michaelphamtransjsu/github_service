@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     GITHUB_OWNER: str | None = None
     GITHUB_REPO: str | None = None
     GITHUB_WEBHOOK_SECRET: SecretStr | None = None
+    GITHUB_API_URL: str = "https://api.github.com"
 
 
 @lru_cache

@@ -19,9 +19,9 @@ def test_request_id_is_generated() -> None:
     assert response.headers["X-Request-ID"]
 
 
-def test_stage_two_route_is_typed_placeholder() -> None:
+def test_unconfigured_github_route_has_typed_error() -> None:
     response = client.get("/issues")
 
-    assert response.status_code == 501
-    assert response.json()["error"]["code"] == "not_implemented"
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "configuration_error"
     assert response.json()["error"]["request_id"] == response.headers["X-Request-ID"]
