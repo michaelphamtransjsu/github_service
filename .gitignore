@@ -8,7 +8,11 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
+.mypy_cache/
+.ruff_cache/
+.tox/
 .venv/
 venv/
 
@@ -27,3 +31,9 @@ Thumbs.db
 build/
 dist/
 *.egg-info/
+
+# Local tooling and transient files
+.python-version
+*.log
+*.swp
+*~
