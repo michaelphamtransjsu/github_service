@@ -1,0 +1,380 @@
+openapi: 3.1.0
+info:
+  title: GitHub Issues Gateway
+  version: 0.1.0
+  description: >-
+    Stage 1 contract for issue and comment management and signed GitHub webhook
+    intake. Except for health, operations return 501 until later stages.
+servers:
+  - url: http://localhost:8000
+    description: Local development
+tags:
+  - name: system
+  - name: issues
+  - name: comments
+  - name: webhooks
+paths:
+  /healthz:
+    get:
+      tags: [system]
+      summary: Check service health
+      operationId: getHealth
+      responses:
+        '200':
+          description: Service is healthy.
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        4XX:
+          $ref: '#/components/responses/ClientError'
+  /issues:
+    get:
+      tags: [issues]
+      summary: List repository issues
+      operationId: listIssues
+      parameters:
+        - $ref: '#/components/parameters/State'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: A page of issues.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/IssueList'}
+        4XX: {$ref: '#/components/responses/ClientError'}
+        '502': {$ref: '#/components/responses/UpstreamError'}
+        '501': {$ref: '#/components/responses/NotImplemented'}
+    post:
+      tags: [issues]
+      summary: Create an issue
+      operationId: createIssue
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/IssueCreate'}
+      responses:
+        '201':
+          description: Issue created.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Issue'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        4XX: {$ref: '#/components/responses/ClientError'}
+        '502': {$ref: '#/components/responses/UpstreamError'}
+        '501': {$ref: '#/components/responses/NotImplemented'}
+  /issues/{issue_number}:
+    parameters:
+      - $ref: '#/components/parameters/IssueNumber'
+    get:
+      tags: [issues]
+      summary: Get an issue
+      operationId: getIssue
+      responses:
+        '200':
+          description: Issue details.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Issue'}
+        4XX: {$ref: '#/components/responses/ClientError'}
+        '502': {$ref: '#/components/responses/UpstreamError'}
+        '501': {$ref: '#/components/responses/NotImplemented'}
+    patch:
+      tags: [issues]
+      summary: Update an issue
+      operationId: updateIssue
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/IssueUpdate'}
+      responses:
+        '200':
+          description: Updated issue.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Issue'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        4XX: {$ref: '#/components/responses/ClientError'}
+        '502': {$ref: '#/components/responses/UpstreamError'}
+        '501': {$ref: '#/components/responses/NotImplemented'}
+    delete:
+      tags: [issues]
+      summary: Close an issue
+      description: GitHub issues cannot be deleted; this operation transitions it to closed.
+      operationId: deleteIssue
+      responses:
+        '204': {description: Issue closed.}
+        4XX: {$ref: '#/components/responses/ClientError'}
+        '502': {$ref: '#/components/responses/UpstreamError'}
+        '501': {$ref: '#/components/responses/NotImplemented'}
+  /issues/{issue_number}/comments:
+    parameters:
+      - $ref: '#/components/parameters/IssueNumber'
+    get:
+      tags: [comments]
+      summary: List issue comments
+      operationId: listIssueComments
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: A page of comments.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CommentList'}
+        4XX: {$ref: '#/components/responses/ClientError'}
+        '502': {$ref: '#/components/responses/UpstreamError'}
+        '501': {$ref: '#/components/responses/NotImplemented'}
+    post:
+      tags: [comments]
+      summary: Add an issue comment
+      operationId: createIssueComment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CommentCreate'}
+      responses:
+        '201':
+          description: Comment created.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Comment'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        4XX: {$ref: '#/components/responses/ClientError'}
+        '502': {$ref: '#/components/responses/UpstreamError'}
+        '501': {$ref: '#/components/responses/NotImplemented'}
+  /issues/{issue_number}/comments/{comment_id}:
+    parameters:
+      - $ref: '#/components/parameters/IssueNumber'
+      - $ref: '#/components/parameters/CommentId'
+    patch:
+      tags: [comments]
+      summary: Update an issue comment
+      operationId: updateIssueComment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CommentUpdate'}
+      responses:
+        '200':
+          description: Updated comment.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Comment'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        4XX: {$ref: '#/components/responses/ClientError'}
+        '502': {$ref: '#/components/responses/UpstreamError'}
+        '501': {$ref: '#/components/responses/NotImplemented'}
+    delete:
+      tags: [comments]
+      summary: Delete an issue comment
+      operationId: deleteIssueComment
+      responses:
+        '204': {description: Comment deleted.}
+        4XX: {$ref: '#/components/responses/ClientError'}
+        '502': {$ref: '#/components/responses/UpstreamError'}
+        '501': {$ref: '#/components/responses/NotImplemented'}
+  /webhooks/github:
+    post:
+      tags: [webhooks]
+      summary: Receive a signed GitHub webhook
+      operationId: receiveGitHubWebhook
+      parameters:
+        - name: X-GitHub-Event
+          in: header
+          required: true
+          schema: {type: string, minLength: 1}
+        - name: X-GitHub-Delivery
+          in: header
+          required: true
+          schema: {type: string, minLength: 1}
+        - name: X-Hub-Signature-256
+          in: header
+          required: true
+          schema: {type: string, pattern: '^sha256=[0-9a-f]{64}$'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, additionalProperties: true}
+      responses:
+        '202':
+          description: Delivery accepted for processing.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WebhookAccepted'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        4XX: {$ref: '#/components/responses/ClientError'}
+        '501': {$ref: '#/components/responses/NotImplemented'}
+components:
+  headers:
+    RequestId:
+      description: Correlation identifier supplied by the client or generated by the service.
+      schema: {type: string}
+  parameters:
+    IssueNumber:
+      name: issue_number
+      in: path
+      required: true
+      schema: {type: integer, minimum: 1}
+    CommentId:
+      name: comment_id
+      in: path
+      required: true
+      schema: {type: integer, minimum: 1}
+    Page:
+      name: page
+      in: query
+      schema: {type: integer, minimum: 1, default: 1}
+    PerPage:
+      name: per_page
+      in: query
+      schema: {type: integer, minimum: 1, maximum: 100, default: 30}
+    State:
+      name: state
+      in: query
+      schema: {type: string, enum: [open, closed, all], default: open}
+  responses:
+    ClientError:
+      description: The request is invalid, unauthenticated, forbidden, or references a missing resource.
+      headers:
+        X-Request-ID: {$ref: '#/components/headers/RequestId'}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorResponse'}
+    ValidationError:
+      description: Request validation failed.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorResponse'}
+    UpstreamError:
+      description: GitHub returned an error or was unavailable.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorResponse'}
+    NotImplemented:
+      description: Reserved for a later project stage.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorResponse'}
+  schemas:
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: {type: string, const: ok}
+    ErrorDetail:
+      type: object
+      additionalProperties: false
+      required: [code, message, request_id]
+      properties:
+        code: {type: string}
+        message: {type: string}
+        request_id: {type: string}
+        details: {type: [object, 'null'], additionalProperties: true}
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error: {$ref: '#/components/schemas/ErrorDetail'}
+    User:
+      type: object
+      additionalProperties: false
+      required: [login, id, avatar_url]
+      properties:
+        login: {type: string}
+        id: {type: integer}
+        avatar_url: {type: string, format: uri}
+    IssueCreate:
+      type: object
+      additionalProperties: false
+      required: [title]
+      properties:
+        title: {type: string, minLength: 1, maxLength: 256}
+        body: {type: [string, 'null']}
+        labels: {type: array, items: {type: string}, default: []}
+        assignees: {type: array, items: {type: string}, default: []}
+    IssueUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        title: {type: [string, 'null'], minLength: 1, maxLength: 256}
+        body: {type: [string, 'null']}
+        state: {type: [string, 'null'], enum: [open, closed, null]}
+        labels:
+          anyOf:
+            - {type: array, items: {type: string}}
+            - {type: 'null'}
+        assignees:
+          anyOf:
+            - {type: array, items: {type: string}}
+            - {type: 'null'}
+    Issue:
+      type: object
+      additionalProperties: false
+      required: [number, title, body, state, html_url, user, labels, assignees, created_at, updated_at]
+      properties:
+        number: {type: integer, minimum: 1}
+        title: {type: string}
+        body: {type: [string, 'null']}
+        state: {type: string, enum: [open, closed]}
+        html_url: {type: string, format: uri}
+        user: {$ref: '#/components/schemas/User'}
+        labels: {type: array, items: {type: string}}
+        assignees: {type: array, items: {$ref: '#/components/schemas/User'}}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    IssueList:
+      type: object
+      additionalProperties: false
+      required: [items, page, per_page]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/Issue'}}
+        page: {type: integer, minimum: 1}
+        per_page: {type: integer, minimum: 1, maximum: 100}
+    CommentCreate:
+      type: object
+      additionalProperties: false
+      required: [body]
+      properties:
+        body: {type: string, minLength: 1}
+    CommentUpdate:
+      $ref: '#/components/schemas/CommentCreate'
+    Comment:
+      type: object
+      additionalProperties: false
+      required: [id, body, html_url, user, created_at, updated_at]
+      properties:
+        id: {type: integer, minimum: 1}
+        body: {type: string}
+        html_url: {type: string, format: uri}
+        user: {$ref: '#/components/schemas/User'}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    CommentList:
+      type: object
+      additionalProperties: false
+      required: [items, page, per_page]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/Comment'}}
+        page: {type: integer, minimum: 1}
+        per_page: {type: integer, minimum: 1, maximum: 100}
+    WebhookAccepted:
+      type: object
+      additionalProperties: false
+      required: [delivery_id, status]
+      properties:
+        delivery_id: {type: string}
+        status: {type: string, const: accepted}
