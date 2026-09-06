@@ -1,26 +1,45 @@
 # GitHub Issues Gateway
 
-Stage 1 establishes the contract and runtime foundation for a FastAPI gateway that
-will manage GitHub issues, comments, and signed webhook deliveries. GitHub calls,
-webhook processing, and persistence workflows are deliberately **not implemented**
-yet; non-health endpoints return a typed `501 Not Implemented` response.
+A FastAPI gateway for one GitHub repository, with signed and idempotent webhook intake. Automated
+tests use mocked HTTP responses; no live repository or real secret is required.
 
-The canonical HTTP contract is [`openapi.yaml`](openapi.yaml). See
-[`AGENTS.md`](AGENTS.md) for reproducible setup, lint, and test commands.
+## Setup
 
-## Configuration
+Python 3.12 is required. Create `.env` locally (it is ignored) from `.env.example`, then run:
 
-Copy `.env.example` to `.env` and replace every placeholder. Never commit `.env`.
-Configuration is read from these fixed names:
+```bash
+python3.12 -m venv .venv
+.venv/bin/python -m pip install --upgrade pip
+.venv/bin/python -m pip install -e '.[dev]'
+make lint test coverage
+make run
+```
 
-| Variable | Purpose |
-| --- | --- |
-| `APP_ENV` | Runtime environment (`development`, `test`, or `production`) |
-| `LOG_LEVEL` | Python logging level |
-| `DATABASE_URL` | SQLite URL |
-| `GITHUB_TOKEN` | GitHub token reserved for a later stage |
-| `GITHUB_OWNER` | Repository owner |
-| `GITHUB_REPO` | Repository name |
-| `GITHUB_WEBHOOK_SECRET` | Secret reserved for signature verification |
+Set `GITHUB_TOKEN`, `GITHUB_OWNER`, and `GITHUB_REPO` only when you intentionally want live API
+access. Set a strong `GITHUB_WEBHOOK_SECRET` before accepting webhooks. The default SQLite file is
+local; Docker Compose stores it in a named volume. Do not expose `/events` publicly without adding
+authentication.
 
-Run locally with `uvicorn app.main:app --reload` and inspect `/docs` or `/healthz`.
+## Examples
+
+```bash
+curl http://localhost:8000/issues?state=open
+curl -X POST http://localhost:8000/issues -H 'Content-Type: application/json' \
+  -d '{"title":"Documentation gap","labels":["docs"]}'
+curl -X PATCH http://localhost:8000/issues/12 -H 'Content-Type: application/json' \
+  -d '{"state":"closed"}'
+curl -X POST http://localhost:8000/issues/12/comments -H 'Content-Type: application/json' \
+  -d '{"body":"Fixed in the next release"}'
+curl http://localhost:8000/events
+```
+
+GitHub must send `X-GitHub-Event`, `X-GitHub-Delivery`, and `X-Hub-Signature-256` headers to
+`POST /webhook`. Generate the signature over the exact raw request bytes; never paste secrets into
+shell history in a real environment. Supported events are `ping`, `issues`, and `issue_comment`.
+
+## Operations
+
+`make docker` builds the image; `docker compose up --build` runs it. The checked-in
+[`openapi.yaml`](openapi.yaml) is the canonical OpenAPI 3.1 contract. See [`DESIGN.md`](DESIGN.md)
+for tradeoffs. Live GitHub and real webhook delivery tests are intentionally manual and must only
+be performed by an authorized user with their own credentials.

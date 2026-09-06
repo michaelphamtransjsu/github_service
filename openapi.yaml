@@ -2,9 +2,7 @@ openapi: 3.1.0
 info:
   title: GitHub Issues Gateway
   version: 0.1.0
-  description: >-
-    Stage 1 contract for issue and comment management and signed GitHub webhook
-    intake. Except for health, operations return 501 until later stages.
+  description: Issue and comment management and signed GitHub webhook intake.
 servers:
   - url: http://localhost:8000
     description: Local development
@@ -48,7 +46,6 @@ paths:
               schema: {$ref: '#/components/schemas/IssueList'}
         4XX: {$ref: '#/components/responses/ClientError'}
         '502': {$ref: '#/components/responses/UpstreamError'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
     post:
       tags: [issues]
       summary: Create an issue
@@ -67,7 +64,6 @@ paths:
         '422': {$ref: '#/components/responses/ValidationError'}
         4XX: {$ref: '#/components/responses/ClientError'}
         '502': {$ref: '#/components/responses/UpstreamError'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /issues/{issue_number}:
     parameters:
       - $ref: '#/components/parameters/IssueNumber'
@@ -83,7 +79,6 @@ paths:
               schema: {$ref: '#/components/schemas/Issue'}
         4XX: {$ref: '#/components/responses/ClientError'}
         '502': {$ref: '#/components/responses/UpstreamError'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
     patch:
       tags: [issues]
       summary: Update an issue
@@ -102,17 +97,6 @@ paths:
         '422': {$ref: '#/components/responses/ValidationError'}
         4XX: {$ref: '#/components/responses/ClientError'}
         '502': {$ref: '#/components/responses/UpstreamError'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
-    delete:
-      tags: [issues]
-      summary: Close an issue
-      description: GitHub issues cannot be deleted; this operation transitions it to closed.
-      operationId: deleteIssue
-      responses:
-        '204': {description: Issue closed.}
-        4XX: {$ref: '#/components/responses/ClientError'}
-        '502': {$ref: '#/components/responses/UpstreamError'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
   /issues/{issue_number}/comments:
     parameters:
       - $ref: '#/components/parameters/IssueNumber'
@@ -131,7 +115,6 @@ paths:
               schema: {$ref: '#/components/schemas/CommentList'}
         4XX: {$ref: '#/components/responses/ClientError'}
         '502': {$ref: '#/components/responses/UpstreamError'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
     post:
       tags: [comments]
       summary: Add an issue comment
@@ -150,40 +133,7 @@ paths:
         '422': {$ref: '#/components/responses/ValidationError'}
         4XX: {$ref: '#/components/responses/ClientError'}
         '502': {$ref: '#/components/responses/UpstreamError'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
-  /issues/{issue_number}/comments/{comment_id}:
-    parameters:
-      - $ref: '#/components/parameters/IssueNumber'
-      - $ref: '#/components/parameters/CommentId'
-    patch:
-      tags: [comments]
-      summary: Update an issue comment
-      operationId: updateIssueComment
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: '#/components/schemas/CommentUpdate'}
-      responses:
-        '200':
-          description: Updated comment.
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/Comment'}
-        '422': {$ref: '#/components/responses/ValidationError'}
-        4XX: {$ref: '#/components/responses/ClientError'}
-        '502': {$ref: '#/components/responses/UpstreamError'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
-    delete:
-      tags: [comments]
-      summary: Delete an issue comment
-      operationId: deleteIssueComment
-      responses:
-        '204': {description: Comment deleted.}
-        4XX: {$ref: '#/components/responses/ClientError'}
-        '502': {$ref: '#/components/responses/UpstreamError'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
-  /webhooks/github:
+  /webhook:
     post:
       tags: [webhooks]
       summary: Receive a signed GitHub webhook
@@ -207,14 +157,27 @@ paths:
           application/json:
             schema: {type: object, additionalProperties: true}
       responses:
-        '202':
-          description: Delivery accepted for processing.
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/WebhookAccepted'}
+        '204': {description: Delivery recorded (or previously recorded).}
         '422': {$ref: '#/components/responses/ValidationError'}
         4XX: {$ref: '#/components/responses/ClientError'}
-        '501': {$ref: '#/components/responses/NotImplemented'}
+  /events:
+    get:
+      tags: [webhooks]
+      summary: List received webhook deliveries
+      operationId: listWebhookEvents
+      parameters:
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100, default: 100}
+      responses:
+        '200':
+          description: Stored deliveries, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {type: object, additionalProperties: true}
+        4XX: {$ref: '#/components/responses/ClientError'}
 components:
   headers:
     RequestId:
