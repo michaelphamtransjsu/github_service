@@ -16,12 +16,14 @@ class EventStore:
         self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.path)
+        connection = sqlite3.connect(self.path, timeout=5.0)
         connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA busy_timeout = 5000")
         return connection
 
     def _initialize(self) -> None:
         with self._connect() as connection:
+            connection.execute("PRAGMA journal_mode = WAL")
             connection.execute(
                 """CREATE TABLE IF NOT EXISTS webhook_events (
                 delivery_id TEXT PRIMARY KEY, event_type TEXT NOT NULL,
@@ -54,4 +56,17 @@ class EventStore:
                 "FROM webhook_events ORDER BY received_at DESC LIMIT ?",
                 (limit,),
             ).fetchall()
-        return [{**dict(row), "payload": json.loads(row["payload"])} for row in rows]
+        events = []
+        for row in rows:
+            payload = json.loads(row["payload"])
+            issue = payload.get("issue") if isinstance(payload, dict) else None
+            events.append(
+                {
+                    "id": row["delivery_id"],
+                    "event": row["event_type"],
+                    "action": row["action"],
+                    "issue_number": issue.get("number") if isinstance(issue, dict) else None,
+                    "timestamp": row["received_at"],
+                }
+            )
+        return events

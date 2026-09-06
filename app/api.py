@@ -3,6 +3,7 @@
 import hashlib
 import hmac
 import json
+import logging
 from collections.abc import AsyncIterator
 from typing import Annotated, Any, Literal
 
@@ -15,6 +16,7 @@ from app.models import (
     Comment,
     CommentCreate,
     CommentList,
+    EventMetadata,
     HealthResponse,
     Issue,
     IssueCreate,
@@ -23,6 +25,7 @@ from app.models import (
 )
 
 router = APIRouter()
+logger = logging.getLogger("github_service.webhook")
 
 
 async def get_github_client() -> AsyncIterator[GitHubClient]:
@@ -43,8 +46,12 @@ async def health() -> HealthResponse:
 
 
 @router.post("/issues", response_model=Issue, status_code=201, tags=["issues"])
-async def create_issue(body: IssueCreate, client: GitHubClient = Depends(get_github_client)) -> Any:
-    return await client.create_issue(body.model_dump(exclude_none=True))
+async def create_issue(
+    body: IssueCreate, response: Response, client: GitHubClient = Depends(get_github_client)
+) -> Any:
+    issue = await client.create_issue(body.model_dump(exclude_none=True))
+    response.headers["Location"] = f"/issues/{issue['number']}"
+    return issue
 
 
 @router.get("/issues", response_model=IssueList, tags=["issues"])
@@ -76,7 +83,7 @@ async def update_issue(
 ) -> Any:
     changes = body.model_dump(exclude_unset=True)
     if not changes:
-        raise HTTPException(422, "At least one field must be supplied.")
+        raise HTTPException(400, "At least one field must be supplied.")
     return await client.update_issue(issue_number, changes)
 
 
@@ -131,15 +138,36 @@ KNOWN_ACTIONS = {
 @router.post("/webhook", status_code=204, tags=["webhooks"])
 async def webhook(
     request: Request,
-    x_github_event: Annotated[str, Header(min_length=1)],
-    x_github_delivery: Annotated[str, Header(min_length=1)],
-    x_hub_signature_256: Annotated[str, Header(pattern=r"^sha256=[0-9a-f]{64}$")],
+    x_github_event: Annotated[str | None, Header()] = None,
+    x_github_delivery: Annotated[str | None, Header()] = None,
+    x_hub_signature_256: Annotated[str | None, Header()] = None,
     store: EventStore = Depends(get_event_store),
 ) -> Response:
     secret = get_settings().GITHUB_WEBHOOK_SECRET
     if secret is None:
         raise HTTPException(503, "Webhook integration is not configured.")
-    raw = await request.body()
+    if (
+        not x_hub_signature_256
+        or not x_hub_signature_256.startswith("sha256=")
+        or len(x_hub_signature_256) != 71
+    ):
+        raise HTTPException(401, "Invalid webhook signature.")
+    try:
+        bytes.fromhex(x_hub_signature_256.removeprefix("sha256="))
+    except ValueError as exc:
+        raise HTTPException(401, "Invalid webhook signature.") from exc
+    if not x_github_event or not x_github_delivery:
+        raise HTTPException(400, "Required webhook headers are missing.")
+    maximum = get_settings().WEBHOOK_MAX_BODY_BYTES
+    content_length = request.headers.get("content-length")
+    if content_length and content_length.isdigit() and int(content_length) > maximum:
+        raise HTTPException(413, "Webhook body is too large.")
+    chunks = bytearray()
+    async for chunk in request.stream():
+        chunks.extend(chunk)
+        if len(chunks) > maximum:
+            raise HTTPException(413, "Webhook body is too large.")
+    raw = bytes(chunks)
     expected = (
         "sha256=" + hmac.new(secret.get_secret_value().encode(), raw, hashlib.sha256).hexdigest()
     )
@@ -152,15 +180,25 @@ async def webhook(
     if not isinstance(payload, dict):
         raise HTTPException(400, "Webhook body must be an object.")
     if x_github_event not in {"ping", *KNOWN_ACTIONS}:
-        raise HTTPException(422, "Unsupported webhook event.")
+        raise HTTPException(400, "Unsupported webhook event.")
     action = payload.get("action")
     if x_github_event in KNOWN_ACTIONS and action not in KNOWN_ACTIONS[x_github_event]:
-        raise HTTPException(422, "Unsupported webhook action.")
-    store.add(x_github_delivery, x_github_event, action, payload)
+        raise HTTPException(400, "Unsupported webhook action.")
+    inserted = store.add(x_github_delivery, x_github_event, action, payload)
+    logger.info(
+        "webhook delivery processed",
+        extra={
+            "request_id": request.state.request_id,
+            "delivery_id": x_github_delivery,
+            "event_type": x_github_event,
+            "action": action,
+            "duplicate": not inserted,
+        },
+    )
     return Response(status_code=204)
 
 
-@router.get("/events", tags=["webhooks"])
+@router.get("/events", response_model=list[EventMetadata], tags=["webhooks"])
 async def list_events(
     limit: Annotated[int, Query(ge=1, le=100)] = 100,
     store: EventStore = Depends(get_event_store),

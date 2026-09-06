@@ -4,17 +4,18 @@ info:
   version: 0.1.0
   description: Issue and comment management and signed GitHub webhook intake.
 servers:
-  - url: http://localhost:8000
-    description: Local development
+- url: http://localhost:8000
+  description: Local development
 tags:
-  - name: system
-  - name: issues
-  - name: comments
-  - name: webhooks
+- name: system
+- name: issues
+- name: comments
+- name: webhooks
 paths:
   /healthz:
     get:
-      tags: [system]
+      tags:
+      - system
       summary: Check service health
       operationId: getHealth
       responses:
@@ -27,48 +28,87 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
-        4XX:
-          $ref: '#/components/responses/ClientError'
+        '400':
+          $ref: '#/components/responses/BadRequest'
   /issues:
     get:
-      tags: [issues]
+      tags:
+      - issues
       summary: List repository issues
       operationId: listIssues
       parameters:
-        - $ref: '#/components/parameters/State'
-        - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/PerPage'
+      - $ref: '#/components/parameters/State'
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
           description: A page of issues.
           content:
             application/json:
-              schema: {$ref: '#/components/schemas/IssueList'}
-        4XX: {$ref: '#/components/responses/ClientError'}
-        '502': {$ref: '#/components/responses/UpstreamError'}
+              schema:
+                $ref: '#/components/schemas/IssueList'
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+            Link:
+              $ref: '#/components/headers/Link'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/UpstreamUnavailable'
+        '504':
+          $ref: '#/components/responses/UpstreamTimeout'
+      security:
+      - BearerAuth: []
     post:
-      tags: [issues]
+      tags:
+      - issues
       summary: Create an issue
       operationId: createIssue
       requestBody:
         required: true
         content:
           application/json:
-            schema: {$ref: '#/components/schemas/IssueCreate'}
+            schema:
+              $ref: '#/components/schemas/IssueCreate'
       responses:
         '201':
           description: Issue created.
           content:
             application/json:
-              schema: {$ref: '#/components/schemas/Issue'}
-        '422': {$ref: '#/components/responses/ValidationError'}
-        4XX: {$ref: '#/components/responses/ClientError'}
-        '502': {$ref: '#/components/responses/UpstreamError'}
+              schema:
+                $ref: '#/components/schemas/Issue'
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+            Location:
+              $ref: '#/components/headers/Location'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/UpstreamUnavailable'
+        '504':
+          $ref: '#/components/responses/UpstreamTimeout'
+      security:
+      - BearerAuth: []
   /issues/{issue_number}:
     parameters:
-      - $ref: '#/components/parameters/IssueNumber'
+    - $ref: '#/components/parameters/IssueNumber'
     get:
-      tags: [issues]
+      tags:
+      - issues
       summary: Get an issue
       operationId: getIssue
       responses:
@@ -76,99 +116,192 @@ paths:
           description: Issue details.
           content:
             application/json:
-              schema: {$ref: '#/components/schemas/Issue'}
-        4XX: {$ref: '#/components/responses/ClientError'}
-        '502': {$ref: '#/components/responses/UpstreamError'}
+              schema:
+                $ref: '#/components/schemas/Issue'
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/UpstreamUnavailable'
+        '504':
+          $ref: '#/components/responses/UpstreamTimeout'
+      security:
+      - BearerAuth: []
     patch:
-      tags: [issues]
+      tags:
+      - issues
       summary: Update an issue
       operationId: updateIssue
       requestBody:
         required: true
         content:
           application/json:
-            schema: {$ref: '#/components/schemas/IssueUpdate'}
+            schema:
+              $ref: '#/components/schemas/IssueUpdate'
       responses:
         '200':
           description: Updated issue.
           content:
             application/json:
-              schema: {$ref: '#/components/schemas/Issue'}
-        '422': {$ref: '#/components/responses/ValidationError'}
-        4XX: {$ref: '#/components/responses/ClientError'}
-        '502': {$ref: '#/components/responses/UpstreamError'}
+              schema:
+                $ref: '#/components/schemas/Issue'
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/UpstreamUnavailable'
+        '504':
+          $ref: '#/components/responses/UpstreamTimeout'
+      security:
+      - BearerAuth: []
   /issues/{issue_number}/comments:
     parameters:
-      - $ref: '#/components/parameters/IssueNumber'
+    - $ref: '#/components/parameters/IssueNumber'
     get:
-      tags: [comments]
+      tags:
+      - comments
       summary: List issue comments
       operationId: listIssueComments
       parameters:
-        - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/PerPage'
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
           description: A page of comments.
           content:
             application/json:
-              schema: {$ref: '#/components/schemas/CommentList'}
-        4XX: {$ref: '#/components/responses/ClientError'}
-        '502': {$ref: '#/components/responses/UpstreamError'}
+              schema:
+                $ref: '#/components/schemas/CommentList'
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+            Link:
+              $ref: '#/components/headers/Link'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/UpstreamUnavailable'
+        '504':
+          $ref: '#/components/responses/UpstreamTimeout'
+      security:
+      - BearerAuth: []
     post:
-      tags: [comments]
+      tags:
+      - comments
       summary: Add an issue comment
       operationId: createIssueComment
       requestBody:
         required: true
         content:
           application/json:
-            schema: {$ref: '#/components/schemas/CommentCreate'}
+            schema:
+              $ref: '#/components/schemas/CommentCreate'
       responses:
         '201':
           description: Comment created.
           content:
             application/json:
-              schema: {$ref: '#/components/schemas/Comment'}
-        '422': {$ref: '#/components/responses/ValidationError'}
-        4XX: {$ref: '#/components/responses/ClientError'}
-        '502': {$ref: '#/components/responses/UpstreamError'}
+              schema:
+                $ref: '#/components/schemas/Comment'
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/UpstreamUnavailable'
+        '504':
+          $ref: '#/components/responses/UpstreamTimeout'
+      security:
+      - BearerAuth: []
   /webhook:
     post:
-      tags: [webhooks]
+      tags:
+      - webhooks
       summary: Receive a signed GitHub webhook
       operationId: receiveGitHubWebhook
       parameters:
-        - name: X-GitHub-Event
-          in: header
-          required: true
-          schema: {type: string, minLength: 1}
-        - name: X-GitHub-Delivery
-          in: header
-          required: true
-          schema: {type: string, minLength: 1}
-        - name: X-Hub-Signature-256
-          in: header
-          required: true
-          schema: {type: string, pattern: '^sha256=[0-9a-f]{64}$'}
+      - name: X-GitHub-Event
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      - name: X-GitHub-Delivery
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      - name: X-Hub-Signature-256
+        in: header
+        required: true
+        schema:
+          type: string
+          pattern: ^sha256=[0-9a-f]{64}$
       requestBody:
         required: true
         content:
           application/json:
-            schema: {type: object, additionalProperties: true}
+            schema:
+              type: object
+              additionalProperties: true
       responses:
-        '204': {description: Delivery recorded (or previously recorded).}
-        '422': {$ref: '#/components/responses/ValidationError'}
-        4XX: {$ref: '#/components/responses/ClientError'}
+        '204':
+          description: Delivery recorded (or previously recorded).
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '503':
+          $ref: '#/components/responses/UpstreamUnavailable'
   /events:
     get:
-      tags: [webhooks]
+      tags:
+      - webhooks
       summary: List received webhook deliveries
       operationId: listWebhookEvents
       parameters:
-        - name: limit
-          in: query
-          schema: {type: integer, minimum: 1, maximum: 100, default: 100}
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 100
       responses:
         '200':
           description: Stored deliveries, newest first.
@@ -176,168 +309,402 @@ paths:
             application/json:
               schema:
                 type: array
-                items: {type: object, additionalProperties: true}
-        4XX: {$ref: '#/components/responses/ClientError'}
+                items:
+                  $ref: '#/components/schemas/EventMetadata'
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+        '400':
+          $ref: '#/components/responses/BadRequest'
 components:
   headers:
     RequestId:
       description: Correlation identifier supplied by the client or generated by the service.
-      schema: {type: string}
+      schema:
+        type: string
+    Location:
+      description: Relative URL of the created issue.
+      schema:
+        type: string
+    Link:
+      description: GitHub pagination links, when available.
+      schema:
+        type: string
+    RetryAfter:
+      description: When the client may retry.
+      schema:
+        type: string
+    RateLimitLimit:
+      description: GitHub rate-limit ceiling.
+      schema:
+        type: string
+    RateLimitRemaining:
+      description: Remaining GitHub requests.
+      schema:
+        type: string
+    RateLimitReset:
+      description: GitHub reset epoch.
+      schema:
+        type: string
+    RateLimitResource:
+      description: GitHub rate-limit resource.
+      schema:
+        type: string
   parameters:
     IssueNumber:
       name: issue_number
       in: path
       required: true
-      schema: {type: integer, minimum: 1}
-    CommentId:
-      name: comment_id
-      in: path
-      required: true
-      schema: {type: integer, minimum: 1}
+      schema:
+        type: integer
+        minimum: 1
     Page:
       name: page
       in: query
-      schema: {type: integer, minimum: 1, default: 1}
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
     PerPage:
       name: per_page
       in: query
-      schema: {type: integer, minimum: 1, maximum: 100, default: 30}
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 30
     State:
       name: state
       in: query
-      schema: {type: string, enum: [open, closed, all], default: open}
+      schema:
+        type: string
+        enum:
+        - open
+        - closed
+        - all
+        default: open
   responses:
-    ClientError:
-      description: The request is invalid, unauthenticated, forbidden, or references a missing resource.
+    BadRequest:
+      description: The request is invalid.
       headers:
-        X-Request-ID: {$ref: '#/components/headers/RequestId'}
+        X-Request-ID:
+          $ref: '#/components/headers/RequestId'
       content:
         application/json:
-          schema: {$ref: '#/components/schemas/ErrorResponse'}
-    ValidationError:
-      description: Request validation failed.
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Authentication or webhook signature is invalid.
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/RequestId'
       content:
         application/json:
-          schema: {$ref: '#/components/schemas/ErrorResponse'}
-    UpstreamError:
-      description: GitHub returned an error or was unavailable.
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: The resource was not found.
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/RequestId'
       content:
         application/json:
-          schema: {$ref: '#/components/schemas/ErrorResponse'}
-    NotImplemented:
-      description: Reserved for a later project stage.
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    PayloadTooLarge:
+      description: The webhook body exceeds the configured limit.
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/RequestId'
       content:
         application/json:
-          schema: {$ref: '#/components/schemas/ErrorResponse'}
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    RateLimited:
+      description: GitHub rate limit exhausted.
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/RequestId'
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/RateLimitLimit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/RateLimitRemaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/RateLimitReset'
+        X-RateLimit-Resource:
+          $ref: '#/components/headers/RateLimitResource'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    UpstreamUnavailable:
+      description: GitHub is unavailable or returned an invalid response.
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    UpstreamTimeout:
+      description: GitHub timed out.
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
   schemas:
     HealthResponse:
       type: object
       additionalProperties: false
-      required: [status]
+      required:
+      - status
       properties:
-        status: {type: string, const: ok}
+        status:
+          type: string
+          const: ok
     ErrorDetail:
       type: object
       additionalProperties: false
-      required: [code, message, request_id]
+      required:
+      - code
+      - message
+      - request_id
       properties:
-        code: {type: string}
-        message: {type: string}
-        request_id: {type: string}
-        details: {type: [object, 'null'], additionalProperties: true}
+        code:
+          type: string
+        message:
+          type: string
+        request_id:
+          type: string
+        details:
+          type:
+          - object
+          - 'null'
+          additionalProperties: true
     ErrorResponse:
       type: object
       additionalProperties: false
-      required: [error]
+      required:
+      - error
       properties:
-        error: {$ref: '#/components/schemas/ErrorDetail'}
+        error:
+          $ref: '#/components/schemas/ErrorDetail'
     User:
       type: object
       additionalProperties: false
-      required: [login, id, avatar_url]
+      required:
+      - login
+      - id
+      - avatar_url
       properties:
-        login: {type: string}
-        id: {type: integer}
-        avatar_url: {type: string, format: uri}
+        login:
+          type: string
+        id:
+          type: integer
+        avatar_url:
+          type: string
+          format: uri
     IssueCreate:
       type: object
       additionalProperties: false
-      required: [title]
+      required:
+      - title
       properties:
-        title: {type: string, minLength: 1, maxLength: 256}
-        body: {type: [string, 'null']}
-        labels: {type: array, items: {type: string}, default: []}
-        assignees: {type: array, items: {type: string}, default: []}
+        title:
+          type: string
+          minLength: 1
+          maxLength: 256
+        body:
+          type:
+          - string
+          - 'null'
+        labels:
+          type: array
+          items:
+            type: string
+          default: []
+        assignees:
+          type: array
+          items:
+            type: string
+          default: []
     IssueUpdate:
       type: object
       additionalProperties: false
       minProperties: 1
       properties:
-        title: {type: [string, 'null'], minLength: 1, maxLength: 256}
-        body: {type: [string, 'null']}
-        state: {type: [string, 'null'], enum: [open, closed, null]}
-        labels:
-          anyOf:
-            - {type: array, items: {type: string}}
-            - {type: 'null'}
-        assignees:
-          anyOf:
-            - {type: array, items: {type: string}}
-            - {type: 'null'}
+        title:
+          type:
+          - string
+          - 'null'
+          minLength: 1
+          maxLength: 256
+        body:
+          type:
+          - string
+          - 'null'
+        state:
+          type:
+          - string
+          - 'null'
+          enum:
+          - open
+          - closed
+          - null
     Issue:
       type: object
       additionalProperties: false
-      required: [number, title, body, state, html_url, user, labels, assignees, created_at, updated_at]
+      required:
+      - number
+      - title
+      - body
+      - state
+      - html_url
+      - user
+      - labels
+      - assignees
+      - created_at
+      - updated_at
       properties:
-        number: {type: integer, minimum: 1}
-        title: {type: string}
-        body: {type: [string, 'null']}
-        state: {type: string, enum: [open, closed]}
-        html_url: {type: string, format: uri}
-        user: {$ref: '#/components/schemas/User'}
-        labels: {type: array, items: {type: string}}
-        assignees: {type: array, items: {$ref: '#/components/schemas/User'}}
-        created_at: {type: string, format: date-time}
-        updated_at: {type: string, format: date-time}
+        number:
+          type: integer
+          minimum: 1
+        title:
+          type: string
+        body:
+          type:
+          - string
+          - 'null'
+        state:
+          type: string
+          enum:
+          - open
+          - closed
+        html_url:
+          type: string
+          format: uri
+        user:
+          $ref: '#/components/schemas/User'
+        labels:
+          type: array
+          items:
+            type: string
+        assignees:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
     IssueList:
       type: object
       additionalProperties: false
-      required: [items, page, per_page]
+      required:
+      - items
+      - page
+      - per_page
       properties:
-        items: {type: array, items: {$ref: '#/components/schemas/Issue'}}
-        page: {type: integer, minimum: 1}
-        per_page: {type: integer, minimum: 1, maximum: 100}
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+        page:
+          type: integer
+          minimum: 1
+        per_page:
+          type: integer
+          minimum: 1
+          maximum: 100
     CommentCreate:
       type: object
       additionalProperties: false
-      required: [body]
+      required:
+      - body
       properties:
-        body: {type: string, minLength: 1}
-    CommentUpdate:
-      $ref: '#/components/schemas/CommentCreate'
+        body:
+          type: string
+          minLength: 1
     Comment:
       type: object
       additionalProperties: false
-      required: [id, body, html_url, user, created_at, updated_at]
+      required:
+      - id
+      - body
+      - html_url
+      - user
+      - created_at
+      - updated_at
       properties:
-        id: {type: integer, minimum: 1}
-        body: {type: string}
-        html_url: {type: string, format: uri}
-        user: {$ref: '#/components/schemas/User'}
-        created_at: {type: string, format: date-time}
-        updated_at: {type: string, format: date-time}
+        id:
+          type: integer
+          minimum: 1
+        body:
+          type: string
+        html_url:
+          type: string
+          format: uri
+        user:
+          $ref: '#/components/schemas/User'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
     CommentList:
       type: object
       additionalProperties: false
-      required: [items, page, per_page]
+      required:
+      - items
+      - page
+      - per_page
       properties:
-        items: {type: array, items: {$ref: '#/components/schemas/Comment'}}
-        page: {type: integer, minimum: 1}
-        per_page: {type: integer, minimum: 1, maximum: 100}
-    WebhookAccepted:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comment'
+        page:
+          type: integer
+          minimum: 1
+        per_page:
+          type: integer
+          minimum: 1
+          maximum: 100
+    EventMetadata:
       type: object
       additionalProperties: false
-      required: [delivery_id, status]
+      required:
+      - id
+      - event
+      - action
+      - issue_number
+      - timestamp
       properties:
-        delivery_id: {type: string}
-        status: {type: string, const: accepted}
+        id:
+          type: string
+        event:
+          type: string
+        action:
+          type:
+          - string
+          - 'null'
+        issue_number:
+          type:
+          - integer
+          - 'null'
+        timestamp:
+          type: string
+          format: date-time
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: token

@@ -3,24 +3,44 @@ from pathlib import Path
 import yaml
 from openapi_spec_validator import validate
 
+from app.main import app
 
-def test_openapi_document_is_valid_31() -> None:
+
+def test_openapi_document_is_valid_31():
     document = yaml.safe_load(Path("openapi.yaml").read_text())
-
     assert document["openapi"].startswith("3.1.")
     validate(document)
 
 
-def test_all_assignment_operations_have_ids_and_error_contracts() -> None:
-    document = yaml.safe_load(Path("openapi.yaml").read_text())
-    operations = [
-        operation
-        for path_item in document["paths"].values()
-        for method, operation in path_item.items()
+def operations(document):
+    return {
+        (path, method)
+        for path, item in document["paths"].items()
+        for method in item
         if method in {"get", "post", "patch", "delete"}
-    ]
+    }
 
-    assert len(operations) == 9
-    assert len({operation["operationId"] for operation in operations}) == len(operations)
-    for operation in operations:
-        assert any(code in operation["responses"] for code in ("4XX", "422"))
+
+def test_checked_in_operations_match_application():
+    checked = yaml.safe_load(Path("openapi.yaml").read_text())
+    assert operations(checked) == operations(app.openapi())
+    assert len(operations(checked)) == 9
+    assert "CommentUpdate" not in checked["components"]["schemas"]
+    assert "CommentId" not in checked["components"]["parameters"]
+    for path, method in operations(checked):
+        operation = checked["paths"][path][method]
+        assert operation["operationId"]
+        assert "400" in operation["responses"]
+        for response in operation["responses"].values():
+            if "$ref" in response and not response["$ref"].endswith(
+                (
+                    "BadRequest",
+                    "Unauthorized",
+                    "NotFound",
+                    "PayloadTooLarge",
+                    "RateLimited",
+                    "UpstreamUnavailable",
+                    "UpstreamTimeout",
+                )
+            ):
+                raise AssertionError("error response does not use reusable Error schema")

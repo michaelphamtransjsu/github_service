@@ -42,8 +42,6 @@ class IssueUpdate(StrictModel):
     title: str | None = Field(default=None, min_length=1, max_length=256)
     body: str | None = None
     state: Literal["open", "closed"] | None = None
-    labels: list[str] | None = None
-    assignees: list[str] | None = None
 
 
 class Issue(StrictModel):
@@ -69,10 +67,6 @@ class CommentCreate(StrictModel):
     body: str = Field(min_length=1)
 
 
-class CommentUpdate(StrictModel):
-    body: str = Field(min_length=1)
-
-
 class Comment(StrictModel):
     id: int
     body: str
@@ -88,6 +82,9 @@ class CommentList(StrictModel):
     per_page: int
 
 
-class WebhookAccepted(StrictModel):
-    delivery_id: str
-    status: Literal["accepted"] = "accepted"
+class EventMetadata(StrictModel):
+    id: str
+    event: str
+    action: str | None
+    issue_number: int | None
+    timestamp: datetime
